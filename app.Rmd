@@ -1,0 +1,257 @@
+---
+title: "Joaquim Almeida"
+output: 
+  flexdashboard::flex_dashboard:
+    # orientation: rows
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r}
+library(flexdashboard)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(readxl)
+library(ggradar)
+library(fmsb)
+library(circlize)
+library(treemap)
+
+df <- read.csv("./datasets/pokemon-cleaned.csv")
+```
+
+Comparações {data-orientation=rows}
+================================================================================
+
+Column {.sidebar }
+--------------------------------------------------------------
+```{r}
+checkboxGroupInput(inputId = "tipo_pokemon", 
+                   label = "Selecione o tipo de Pokemon",
+                   choices = (unique(df$primary_type)),
+                   selected = df$primary_type)
+```
+
+Row Dispersão
+-----------------------------------------------------------------------
+
+### Dispersão entre Ataque x Defesa por tipo
+```{r}
+renderPlot({
+  valor <- df %>%
+    na.omit(primary_type) %>%
+    filter(primary_type %in% input$tipo_pokemon)
+  ggplot(valor,
+    aes(x = Attack, y = Defense, color = primary_type)) +
+    geom_point(alpha = 0.7) +
+    scale_size(range = c(2, 10)) +
+    labs(
+      x = "Ataque",
+      y = "Defesa",
+      color = "Tipo Pokemon"
+    ) +
+    theme_minimal()
+})
+```
+
+Row Gráfico de Barra
+-----------------------------------------------------------------------
+
+### Top mais fortes por tipo
+```{r}
+
+renderPlot({
+  valor <- df %>%
+    na.omit(primary_type) %>%
+    group_by(primary_type) %>%
+    filter(primary_type %in% input$tipo_pokemon) %>%
+    summarise(media_total = mean(Total)) %>%
+    arrange(media_total)
+  
+  ggplot(valor, aes(x = primary_type, y = media_total)) +
+  geom_bar(stat = "identity") +
+  labs(
+    x = "Tipo Pokemon",
+    y = "Total de Atributos"
+  ) +
+  theme_minimal()
+})
+```
+
+Row Radar Médias
+
+-----------------------------------------------------------------------
+
+### Média habilidades por tipo
+```{r}
+renderPlot({
+  average_stats_by_type <- df %>%
+    group_by(primary_type) %>%
+    filter(Name %in% input$pokemons) %>%
+    summarise(
+      Avg_HP = mean(HP, na.rm = TRUE),
+      Avg_Attack = mean(Attack, na.rm = TRUE),
+      Avg_Defense = mean(Defense, na.rm = TRUE),
+      Avg_SpecialAttack = mean(Special.Attack, na.rm = TRUE),
+      Avg_SpecialDefense = mean(Special.Defense, na.rm = TRUE),
+      Avg_Speed = mean(Speed, na.rm = TRUE)
+    ) 
+  ggradar(average_stats_by_type,
+          values.radar = c("0", "150", "300"),
+          axis.labels = c("HP", "ATK", "DEF", "ATK. Especial", "DEF. Especial", "Velocidade"))
+})
+```
+
+Info. Indivíduais {data-orientation=column}
+================================================================================
+
+Column {.sidebar }
+--------------------------------------------------------------
+```{r}
+selectInput(inputId = "pokemons",
+            label="Selecione os pokemons:",
+            choices = unique(df$Name),
+            selected = "",
+            multiple = FALSE
+            )
+```
+
+Column Radar
+-----------------------------------------------------------------------
+
+### Radar de Habilidades
+```{r}
+renderPlot({
+  valor <- df %>%
+    filter(Name %in% input$pokemons) %>%
+    select(-c(X, X., HP, primary_type, secondary_type, Total))
+  
+  ggradar(valor,
+          values.radar = c("0", "150", "300"),
+          axis.labels = c("Ataque", "Defesa", "ATK. Especial", "DEF. Especial", "Velocidade"),
+          # Poligonos
+          group.line.width = 1, 
+          group.point.size = 3,
+          background.circle.colour = "white",
+          gridline.mid.colour = "grey",
+          legend.position = "bottom")
+  # radarchart(valor)
+})
+```
+
+Column Gauges
+-----------------------------------------------------------------------
+
+### Ataque especial
+
+```{r}
+
+renderGauge({
+  valor <- df %>%
+    filter(Name %in% input$pokemons)
+  gauge(valor$Special.Attack, min = 0, max = 300, gaugeSectors(
+    success = c(200, 300), warning = c(100, 199), danger = c(0, 99)
+  ))
+})
+```
+
+### Defesa especial
+
+```{r}
+renderGauge({
+  valor <- df %>%
+    filter(Name %in% input$pokemons)
+  gauge(valor$Special.Defense, min = 0, max = 300, gaugeSectors(
+    success = c(200, 300), warning = c(100, 199), danger = c(0, 99)
+  ))
+})
+```
+
+### Velocidade
+
+```{r}
+renderGauge({
+  valor <- df %>%
+    filter(Name %in% input$pokemons)
+  gauge(valor$Speed, min = 0, max = 300, gaugeSectors(
+    success = c(200, 300), warning = c(100, 199), danger = c(0, 99)
+  ))
+})
+```
+
+### HP
+
+```{r}
+renderGauge({
+  valor <- df %>%
+    filter(Name %in% input$pokemons)
+  gauge(valor$HP, min = 0, max = 300, gaugeSectors(
+    success = c(200, 300), warning = c(100, 199), danger = c(0, 99)
+  ))
+})
+```
+
+### Ataque 
+
+```{r}
+renderGauge({
+  valor <- df %>%
+    filter(Name %in% input$pokemons)
+  gauge(valor$Attack, min = 0, max = 300, gaugeSectors(
+    success = c(200, 300), warning = c(100, 199), danger = c(0, 99)
+  ))
+})
+```
+
+### Defesa
+
+```{r}
+renderGauge({
+  valor <- df %>%
+    filter(Name %in% input$pokemons)
+  gauge(valor$Defense, min = 0, max = 300, gaugeSectors(
+    success = c(200, 300), warning = c(100, 199), danger = c(0, 99)
+  ))
+})
+```
+
+Infos estáticas
+================================================================================
+
+Column
+-----------------------------------------------------------------------
+
+### Combinações mais comuns dos tipos de Pokemons
+```{r}
+type_combinations <- df %>%
+  na.omit(secondary_type) %>%
+  group_by(primary_type, secondary_type) %>%
+  summarise(Frequency = n(), .groups = "drop") %>%
+  arrange(desc(Frequency))
+
+chordDiagram(type_combinations[1:5, ],col=rainbow(6),
+             annotationTrackHeight = mm_h(c(3, 3)),
+             annotationTrack = c("name", "grid"),
+             grid.border = "black",
+             diffHeight = mm_h(5))
+```
+
+Column
+-----------------------------------------------------------------------
+
+### Proporção de tipos mais comuns de Pokemons
+```{r}
+# Mapa de arvore
+treemap_data <- df %>%
+  na.omit(secondary_type) %>%
+  group_by(primary_type, secondary_type) %>%
+  summarise(Frequency = n()) %>%
+  ungroup()
+
+# Criar o treemap
+treemap(treemap_data,
+        index = c("primary_type"),
+        vSize = "Frequency")
+```
+
